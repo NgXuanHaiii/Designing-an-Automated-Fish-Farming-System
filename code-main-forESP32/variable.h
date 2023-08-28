@@ -1,0 +1,51 @@
+// Define input/output
+#define LIGHT 26
+#define WATER_LEVEL 25
+#define FEED_MOTOR 14
+#define FEED_SWITCH 13
+#define ONE_WIRE_BUS 27
+
+#define BUTTON 15
+#define BUTTON_BACK 19
+
+// Rotate
+#define OUTPUT_A 2
+#define OUTPUT_B 4
+
+// Rotate encoder
+int currentStateA;
+int lastStateA;
+
+// OLED display
+int item_selected = 0; 
+int item_sel_previous; 
+int item_sel_next;
+int sub_item_select;
+int menu_index = 0;
+
+// Control
+int selectBtn;
+int backBtn;
+int currentSelectSub;
+
+// Light
+bool auto_light;
+int light_percent;
+
+// Feed
+int currentStateMotor = 1;
+bool isMotorRunning = false;
+bool isSwitchActive = false;
+
+// Sensors
+int light;
+int water_level;
+int tds;
+
+float temperature_DS;
+
+
+
+// Delay
+unsigned long delayReadSensor;
+
