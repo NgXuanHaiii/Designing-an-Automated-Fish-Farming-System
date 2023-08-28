@@ -1,10 +1,29 @@
+#include "WString.h"
+#include "esp32-hal-gpio.h"
 #include "variable.h"
 #include "images.h"
 #include "oled.h"
 #include "TDS.h"
 #include "FET.h"
-#include "DS18B20.h"
- 
+#include "AR.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <WiFi.h>
+#include <FirebaseESP32.h>
+#include <addons/TokenHelper.h>
+#include <addons/RTDBHelper.h>
+#define WIFI_SSID "_ngxuanhai"
+#define WIFI_PASSWORD "79797978"
+#define API_KEY "AIzaSyDgVHsv9iT27UbR5qOly58FslXgFtajT40"
+#define DATABASE_URL "pj2-aqua-default-rtdb.firebaseio.com/"
+#define USER_EMAIL "binhbanhbeo246@gmail.com"
+#define USER_PASSWORD "21102002binh"
+FirebaseData fbdo;
+
+FirebaseAuth auth;
+FirebaseConfig config;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 
 void displayWaterLevel(int value) {
   float max = 2600;
@@ -23,6 +42,7 @@ void displayWaterLevel(int value) {
   display.print(percent);
   display.print("%");
   display.display();
+  Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/mucnuoc"), percent) ? "ok" : fbdo.errorReason().c_str());
 }
 
 void displayDirtWater(int value) {
@@ -34,6 +54,7 @@ void displayDirtWater(int value) {
   display.print(value);
   display.print("ppm");
   display.display();
+ Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/doduc"), tdsValue) ? "ok" : fbdo.errorReason().c_str());
 }
 
 void displayLightValue(int light_percent) {
@@ -46,6 +67,7 @@ void displayLightValue(int light_percent) {
   display.drawBitmap(0, 32, epd_bitmap_options_brightness[0], 128, 16, WHITE);
   display.drawBitmap(0, 48, epd_bitmap_options_brightness[1], 128, 16, WHITE);
   display.display();
+  Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/anhsang"), light_percent) ? "ok" : fbdo.errorReason().c_str());
 }
 
 void displayPump() {
@@ -65,16 +87,25 @@ void displayEatControl() {
   display.drawBitmap(0, 48, epd_bitmap_options_brightness[1], 128, 16, WHITE);
   display.display();
 }
-void displayTemperature( float value) {
+void displayTemperature( int value) {
+  sensors.requestTemperatures();
+  float temperatureC = sensors.getTempCByIndex(0);
+  // float temperatureF = (temperatureC * 9.0) / 5.0 + 32.0;
   display.clearDisplay();
   display.drawBitmap(0, 0, epd_bitmap_sub_title[5], 128, 16, WHITE);
-  display.setCursor(0, 20);
-  display.println("Temp:");
-  display.setCursor(0, 40);
-  display.print(value,1);
+  display.setCursor(0, 30);
+  display.print(temperatureC);
+  Serial.print(temperatureC);
+  // Serial.print(temperatureF);
   // display.print((char)176);
   display.print("C");
+  // display.setCursor(0, 40);
+  // display.print(temperatureF);
+  // display.print((char)176);
+  // display.print("F");
   display.display();
+  Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/nhietdo"),nhietdo ) ? "ok" : fbdo.errorReason().c_str());
+
 }
 
 void displayMenu() {
@@ -91,11 +122,12 @@ void readSensors(int delay) {
   if (millis() - delayReadSensor >= delay) {
     light = analogRead(LIGHT);
     water_level = analogRead(WATER_LEVEL);
-  
+    ard = digitalRead(AR);
+    nhietdo = sensors.getTempCByIndex(0);
     delayReadSensor = millis();
+
   }
   readTDS(tds);
-
   
 }
 
@@ -117,7 +149,8 @@ void displaySubMenu(int item_selected) {
       displayPump();
       break;
     case 6 : 
-      displayTemperature(temperature_DS);
+      displayTemperature(nhietdo);
+      break;
     default:
       Serial.println("No menu !!");
   }
@@ -168,7 +201,7 @@ void handleSelect() {
     lastStateA = currentStateA;
   }
   // Put in a slight delay to help debounce the reading
-  delay(5);
+  delay(10);
 }
 
 void controlGPIO() {
@@ -179,11 +212,13 @@ void controlGPIO() {
         if (sub_item_select == 0) {
           ledcWrite(ledChannel, 255);
           auto_light = false;
+          Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/light"), 1) ? "ok" : fbdo.errorReason().c_str());
         }
 
         if (sub_item_select == 16) {
           ledcWrite(ledChannel, 0);
           auto_light = true;
+         Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/light"), 0) ? "ok" : fbdo.errorReason().c_str());
         }
       }
 
@@ -192,22 +227,29 @@ void controlGPIO() {
           isMotorRunning = true;
           Serial.println("Feed Run");
           ledcWrite(feedChannel, 255);
+          Serial.printf("Set string... %s\n", Firebase.setString(fbdo, F("/pj2-aqua/sw_feed"), "ON") ? "ok" : fbdo.errorReason().c_str());
         }
 
         if (sub_item_select == 16) {
           isMotorRunning = false;
           Serial.println("Feed Stop");
           ledcWrite(feedChannel, 0);
+          Serial.printf("Set string... %s\n", Firebase.setString(fbdo, F("/pj2-aqua/sw_feed"), "OFF") ? "ok" : fbdo.errorReason().c_str());
         }
       }
 
       if (currentSelectSub == 4) {
         if (sub_item_select == 0) {
-          ledcWrite(waterChannel, 255);
+         digitalWrite(FEED_MOTOR, HIGH);
+        //  String Motorstatus = "ON";
+          Serial.printf("Set string... %s\n", Firebase.setString(fbdo, F("/pj2-aqua/sw_pump"), "ON") ? "ok" : fbdo.errorReason().c_str());
         }
-
+      
         if (sub_item_select == 16) {
-          ledcWrite(waterChannel, 0);
+        digitalWrite(FEED_MOTOR, LOW);
+        // String Motorstatus = "OFF";
+        Serial.printf("Set string... %s\n", Firebase.setString(fbdo, F("/pj2-aqua/sw_pump"), "OFF") ? "ok" : fbdo.errorReason().c_str());
+    
         }
       }
     }
@@ -254,3 +296,20 @@ void controlScreen() {
     }
   }
 }
+
+void readTemperature()
+{
+  sensors.requestTemperatures();
+  nhietdo = sensors.getTempCByIndex(0);  
+  Serial.print("Nhiet do");
+  Serial.println(sensors.getTempCByIndex(0)); // vì 1 ic nên dùng 0
+  
+
+}
+void ARsensor (){
+    ard = digitalRead(AR);
+    // Serial.print("GTCB:");
+    // Serial.println(ard);
+    Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, F("/pj2-aqua/cam"), ard) ? "ok" : fbdo.errorReason().c_str());
+}
+

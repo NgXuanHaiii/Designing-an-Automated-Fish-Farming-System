@@ -1,12 +1,15 @@
 // Define input/output
-#define LIGHT 26
-#define WATER_LEVEL 25
+#define LIGHT 34
+#define WATER_LEVEL 35
 #define FEED_MOTOR 14
 #define FEED_SWITCH 13
-#define ONE_WIRE_BUS 27
 
+
+#define AR 32 
 #define BUTTON 15
 #define BUTTON_BACK 19
+#define ONE_WIRE_BUS 27
+
 
 // Rotate
 #define OUTPUT_A 2
@@ -41,11 +44,9 @@ bool isSwitchActive = false;
 int light;
 int water_level;
 int tds;
-
-float temperature_DS;
-
-
-
+int temp;
+int ard;
+int  nhietdo;
 // Delay
 unsigned long delayReadSensor;
 
